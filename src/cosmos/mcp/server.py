@@ -7,7 +7,7 @@ This file contains the server for the Cosmos DB MCP service.
 import uvicorn
 import argparse
 from mcp.server.fastmcp import FastMCP
-from cosmos import CosmosDBServer
+from .cosmos import CosmosDBServer
 
 from mcp.server import Server
 

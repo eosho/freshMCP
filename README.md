@@ -69,7 +69,7 @@ cp .env.example .env
 **Start the Cosmos DB MCP server:**
 
 ```bash
-python ./src/cosmos/server/server.py
+python -m src.cosmos.mcp.server
 ```
 
 > The server will start on `http://localhost:8001/cosmos/sse`
@@ -77,10 +77,10 @@ python ./src/cosmos/server/server.py
 **Start the AI Search MCP server:**
 
 ```bash
-python ./src/search/server/server.py
+python -m src.search.mcp.server
 ```
 
-> The server will start on `http://localhost:8001/search/sse`
+> The server will start on `http://localhost:8002/search/sse`
 
 ---
 
@@ -99,7 +99,7 @@ Add the tools of any MCP server to VSCode or Cursor providing a JSON configurati
     },
     "search_mcp_local": {
       "type": "sse",
-      "url": "http://localhost:8001/search/sse"
+      "url": "http://localhost:8002/search/sse"
     }
   }
 }
@@ -116,7 +116,7 @@ Add the tools of any MCP server to VSCode or Cursor providing a JSON configurati
     },
     "search_mcp_local": {
       "type": "sse",
-      "url": "http://localhost:8001/search/sse"
+      "url": "http://localhost:8002/search/sse"
     }
   }
 }
@@ -198,11 +198,10 @@ Required environment variables (use a table to list them):
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `COSMOS_ACCOUNT_NAME` | Your Cosmos DB account name | No |
-| `SEARCH_SERVICE_NAME` | Your AI Search service name | No |
 | `AZURE_TENANT_ID` | Azure tenant ID | Yes (If using Service Principal) |
 | `AZURE_CLIENT_ID` | Client ID for authentication | Yes (If using Service Principal) |
 | `AZURE_CLIENT_SECRET` | Client secret for authentication | Yes (If using Service Principal) |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | Application Insights connection string | No |
 
 ---
 

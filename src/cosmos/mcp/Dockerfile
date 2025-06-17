@@ -1,4 +1,4 @@
-# Dockerfile for Azure Search MCP Service
+# Dockerfile for Azure Cosmos DB MCP Service
 FROM python:3.11-slim AS base
 
 # Set environment variables
@@ -40,5 +40,5 @@ USER appuser
 # Expose the FastAPI port
 EXPOSE 8001
 
-# Start the Search MCP server
-CMD ["python", "src/search/server/server.py"]
+# Start the Cosmos MCP server
+CMD ["python", "-m", "src.cosmos.mcp.server"]

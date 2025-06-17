@@ -57,11 +57,13 @@ class SearchServer(Server):
         Returns:
             SearchClient: The Search client
         """
-        search_service_name = service_name or os.getenv("SEARCH_SERVICE_NAME")
-        if not search_service_name:
-            raise ValueError("SEARCH_SERVICE_NAME environment variable is not set")
+        if not service_name:
+            raise ValueError("Service name is required")
 
-        search_endpoint = f"https://{search_service_name}.search.windows.net"
+        search_endpoint = f"https://{service_name}.search.windows.net"
+
+        if not index_name:
+            raise ValueError("Index name is required")
 
         try:
             client = SearchClient(
@@ -84,11 +86,10 @@ class SearchServer(Server):
         Returns:
             SearchIndexClient: The SearchIndexClient
         """
-        search_service_name = service_name or os.getenv("SEARCH_SERVICE_NAME")
-        if not search_service_name:
-            raise ValueError("SEARCH_SERVICE_NAME environment variable is not set")
+        if not service_name:
+            raise ValueError("Service name is required")
 
-        search_endpoint = f"https://{search_service_name}.search.windows.net"
+        search_endpoint = f"https://{service_name}.search.windows.net"
 
         try:
             client = SearchIndexClient(
@@ -180,8 +181,10 @@ class SearchServer(Server):
         Returns:
             List[str]: A list of search index names
         """
+        logger.info(f"Listing indexes for service: {service_name}")
         client = self.get_index_client(service_name)
         indexes = client.list_indexes()
+        logger.info(f"Indexes: {indexes}")
         return [index.name for index in indexes]
 
     async def _delete_index(self, service_name: str, index_name: str) -> Dict[str, Any]:
@@ -194,6 +197,7 @@ class SearchServer(Server):
         Returns:
             Dict[str, Any]: A dictionary with a message indicating the index was deleted
         """
+        logger.info(f"Deleting index: {index_name} for service: {service_name}")
         client = self.get_index_client(service_name)
         client.delete_index(index_name)
         return {"message": f"Index {index_name} deleted successfully"}
@@ -210,6 +214,7 @@ class SearchServer(Server):
         Returns:
             List[Dict[str, Any]]: A list of search results
         """
+        logger.info(f"Querying index: {index_name} for service: {service_name}")
         client = self.get_search_client(service_name, index_name)
 
         # Map query type to QueryType enum
@@ -225,6 +230,7 @@ class SearchServer(Server):
             query_type=query_type_map.get(query_type, QueryType.SIMPLE)
         )
 
+        logger.info(f"Search results: {results}")
         return [result.to_dict() for result in results]
 
     async def _describe_index(self, service_name: str, index_name: str) -> Dict[str, Any]:
@@ -237,6 +243,8 @@ class SearchServer(Server):
         Returns:
             Dict[str, Any]: A dictionary containing the index description
         """
+        logger.info(f"Describing index: {index_name} for service: {service_name}")
         client = self.get_index_client(service_name)
         index = client.get_index(index_name)
+        logger.info(f"Index description: {index.to_dict()}")
         return index.to_dict()
