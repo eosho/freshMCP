@@ -88,32 +88,6 @@ def get_cosmosdb_tools() -> list[Tool]:
             },
         ),
         Tool(
-            name="cosmosdb_container_describe",
-            description="Get details about a Cosmos DB container",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "account_name": {
-                        "type": "string",
-                        "description": "Name of the Cosmos DB account",
-                    },
-                    "container_name": {
-                        "type": "string",
-                        "description": "Name of the Cosmos DB container",
-                    },
-                    "database_name": {
-                        "type": "string",
-                        "description": "Name of the Cosmos DB database.",
-                    },
-                },
-                "required": [
-                  "account_name",
-                  "container_name",
-                  "database_name"
-                ],
-            },
-        ),
-        Tool(
             name="cosmosdb_container_list",
             description="List all Cosmos DB containers in a database",
             inputSchema={
@@ -161,37 +135,6 @@ def get_cosmosdb_tools() -> list[Tool]:
             },
         ),
         Tool(
-            name="cosmosdb_item_create",
-            description="Create a new item in a Cosmos DB container",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "account_name": {
-                        "type": "string",
-                        "description": "Name of the Cosmos DB account",
-                    },
-                    "container_name": {
-                        "type": "string",
-                        "description": "Name of the Cosmos DB container",
-                    },
-                    "database_name": {
-                        "type": "string",
-                        "description": "Name of the Cosmos DB database",
-                    },
-                    "item": {
-                        "type": "object",
-                        "description": "Item data to create (JSON object)",
-                    },
-                },
-                "required": [
-                  "account_name",
-                  "container_name",
-                  "database_name",
-                  "item"
-                ],
-            },
-        ),
-        Tool(
             name="cosmosdb_item_read",
             description="Read an item from a Cosmos DB container",
             inputSchema={
@@ -212,83 +155,6 @@ def get_cosmosdb_tools() -> list[Tool]:
                     "item_id": {
                         "type": "string",
                         "description": "ID of the item to read",
-                    },
-                    "partition_key": {
-                        "type": "string",
-                        "description": "Partition key value for the item",
-                    },
-                },
-                "required": [
-                  "account_name",
-                  "container_name",
-                  "database_name",
-                  "item_id",
-                  "partition_key"
-                ],
-            },
-        ),
-        Tool(
-            name="cosmosdb_item_replace",
-            description="Replace an item in a Cosmos DB container",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "account_name": {
-                        "type": "string",
-                        "description": "Name of the Cosmos DB account",
-                    },
-                    "container_name": {
-                        "type": "string",
-                        "description": "Name of the Cosmos DB container",
-                    },
-                    "database_name": {
-                        "type": "string",
-                        "description": "Name of the Cosmos DB database",
-                    },
-                    "item_id": {
-                        "type": "string",
-                        "description": "ID of the item to replace",
-                    },
-                    "partition_key": {
-                        "type": "string",
-                        "description": "Partition key value for the item",
-                    },
-                    "item": {
-                        "type": "object",
-                        "description": "Updated item data (JSON object)",
-                    },
-                },
-                "required": [
-                  "account_name",
-                  "container_name",
-                  "database_name",
-                  "item_id",
-                  "partition_key",
-                  "item"
-                ],
-            },
-        ),
-        Tool(
-            name="cosmosdb_item_delete",
-            description="Delete an item from a Cosmos DB container",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "account_name": {
-                        "type": "string",
-                        "description": "Name of the Cosmos DB account",
-                    },
-                    "container_name": {
-                        "type": "string",
-                        "description": "Name of the Cosmos DB container",
-                    },
-                    "database_name": {
-                        "type": "string",
-                        "description": "Name of the Cosmos DB database",
-                    },
-                    "item_id": {
-                        "type": "string",
-                        "description": "ID of the item to delete",
                     },
                     "partition_key": {
                         "type": "string",

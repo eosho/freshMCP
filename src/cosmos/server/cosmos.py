@@ -109,7 +109,7 @@ class CosmosDBServer(Server):
             error_msg = f"Unexpected error: {str(e)}"
             logger.error(error_msg)
             return {"error": error_msg}
-
+        
     async def _list_databases(self, account_name: str) -> Dict[str, Any]:
         """
         List the databases in the Cosmos DB.
