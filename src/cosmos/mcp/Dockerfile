@@ -25,11 +25,8 @@ RUN useradd -m -u 1000 appuser
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project files
-COPY . /app
-
-# Install the project in editable mode
-RUN pip install -e .
+# Copy only the cosmos directory and its contents
+COPY src/cosmos/mcp /app/cosmos_mcp
 
 # Fix permissions
 RUN chown -R appuser:appuser /app
@@ -41,4 +38,4 @@ USER appuser
 EXPOSE 8001
 
 # Start the Cosmos MCP server
-CMD ["python", "-m", "src.cosmos.mcp.server"]
+CMD ["python", "-m", "cosmos_mcp.server"]

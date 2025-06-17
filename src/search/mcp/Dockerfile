@@ -25,11 +25,8 @@ RUN useradd -m -u 1000 appuser
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project files
-COPY . /app
-
-# Install the project in editable mode
-RUN pip install -e .
+# Copy only the search directory and its contents
+COPY src/search/mcp /app/search_mcp
 
 # Fix permissions
 RUN chown -R appuser:appuser /app
@@ -41,4 +38,4 @@ USER appuser
 EXPOSE 8002
 
 # Start the Search MCP server
-CMD ["python", "-m", "src.search.mcp.server"]
+CMD ["python", "-m", "search_mcp.server"]
