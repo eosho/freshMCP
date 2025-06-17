@@ -1,6 +1,13 @@
 // ------------------
 //    PARAMETERS
 // ------------------
+@description('Name of your deployment environment.')
+@allowed([
+  'dev'
+  'qa'
+  'prod'
+])
+param environment string = 'dev'
 
 @description('APIM SKU Tier to deploy. Choose between BasicV2 or StandardV2.')
 @allowed([
@@ -21,6 +28,10 @@ param cosmosAPIPath string = 'cosmos'
 @description('URL path prefix for the Azure AI Search MCP API within API Management.')
 param searchAPIPath string = 'search'
 
+@description('Resource tags')
+param tags object = {
+  'azd-env-name': environment
+}
 // ------------------
 //    VARIABLES
 // ------------------
@@ -36,6 +47,7 @@ var acrPullRole = resourceId('Microsoft.Authorization/roleDefinitions', '7f951dd
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: 'workspace-${resourceSuffix}'
   location: location
+  tags: tags
   properties: any({
     retentionInDays: 30
     features: {
@@ -53,6 +65,9 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-11-01-pr
   sku: {
     name: 'Basic'
   }
+  tags: union(tags, {
+    'azd-container-registry': 'true'
+  })
   properties: {
     adminUserEnabled: true
     anonymousPullEnabled: false
@@ -93,6 +108,7 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-11-01-pr
 resource containerAppEnv 'Microsoft.App/managedEnvironments@2023-11-02-preview' = {
   name: 'aca-env-${resourceSuffix}'
   location: location
+  tags: tags
   properties: {
     appLogsConfiguration: {
       destination: 'log-analytics'
@@ -107,6 +123,7 @@ resource containerAppEnv 'Microsoft.App/managedEnvironments@2023-11-02-preview' 
 resource containerAppUAI 'Microsoft.ManagedIdentity/userAssignedIdentities@2022-01-31-preview' = {
   name: 'aca-mi-${resourceSuffix}'
   location: location
+  tags: tags
 }
 
 resource containerAppUAIRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -127,12 +144,15 @@ resource cosmosMCPServerContainerApp 'Microsoft.App/containerApps@2023-11-02-pre
       '${containerAppUAI.id}': {}
     }
   }
+  tags: union(tags, {
+    'azd-service-name': 'cosmos-mcp'
+  })
   properties: {
     managedEnvironmentId: containerAppEnv.id
     configuration: {
       ingress: {
         external: true
-        targetPort: 8080
+        targetPort: 8001
         allowInsecure: false
       }
       registries: [
@@ -170,12 +190,15 @@ resource searchMCPServerContainerApp 'Microsoft.App/containerApps@2023-11-02-pre
       '${containerAppUAI.id}': {}
     }
   }
+  tags: union(tags, {
+    'azd-service-name': 'search-mcp'
+  })
   properties: {
     managedEnvironmentId: containerAppEnv.id
     configuration: {
       ingress: {
         external: true
-        targetPort: 8080
+        targetPort: 8002
         allowInsecure: false
       }
       registries: [
@@ -207,6 +230,7 @@ resource searchMCPServerContainerApp 'Microsoft.App/containerApps@2023-11-02-pre
 resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
   name: 'insights-${resourceSuffix}'
   location: location
+  tags: tags
   kind: 'web'
   properties: {
     Application_Type: 'web'
@@ -221,6 +245,7 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
 resource apimService 'Microsoft.ApiManagement/service@2024-06-01-preview' = {
   name: apiManagementName
   location: location
+  tags: tags
   sku: {
     name: apimSku
     capacity: 1
@@ -308,3 +333,5 @@ output logAnalyticsWorkspaceId string = logAnalytics.properties.customerId
 output apimServiceId string = apimService.id
 output apimResourceName string = apimService.name
 output apimResourceGatewayURL string = apimService.properties.gatewayUrl
+
+output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerRegistry.properties.loginServer
