@@ -129,7 +129,11 @@ Add the tools of any MCP server to VSCode or Cursor providing a JSON configurati
 1. Initialize azd (if not already done):
 
 ```bash
-azd init
+azd init -e dev -l eastus 
+
+# -e dev is optional, it will create a new dev environment
+
+# -l eastus is optional, it will create the resources in the eastus region
 ```
 
 2. Deploy the application:
@@ -140,12 +144,10 @@ azd up
 
 This will:
 
-- Create an Azure Container Registry
-- Build and push your Docker image
-- Create an Azure Container App environment
-- Deploy your container app
-- Create and configure Azure services (Cosmos DB, AI Search)
-- Set up all necessary connections
+- Packages the project/services
+- Provision all the necessary Azure services
+- Build and push the Docker images to the Azure Container Registry
+- Deploy the images to the Azure Container Apps
 
 ---
 
@@ -210,7 +212,7 @@ Required environment variables (use a table to list them):
 To monitor your application:
 
 ```bash
-azd monitor
+azd monitor -e dev
 ```
 
 ---
