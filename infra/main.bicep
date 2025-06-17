@@ -9,7 +9,6 @@ param location string = resourceGroup().location
 
 param cosmosAPIPath string = 'cosmos'
 param searchAPIPath string = 'search'
-param forceUpdateTag string = utcNow()
 
 // ------------------
 //    VARIABLES
