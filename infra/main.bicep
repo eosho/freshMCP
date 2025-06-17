@@ -2,12 +2,23 @@
 //    PARAMETERS
 // ------------------
 
+@description('APIM SKU Tier to deploy. Choose between BasicV2 or StandardV2.')
+@allowed([
+  'BasicV2'
+  'StandardV2'
+])
 param apimSku string = 'BasicV2'
+
+@description('The name of the logger configured for Azure API Management (e.g., for App Insights).')
 param apimLoggerName string = 'apim-logger'
 
+@description('The Azure region where resources will be deployed.')
 param location string = resourceGroup().location
 
+@description('URL path prefix for the Cosmos MCP API within API Management.')
 param cosmosAPIPath string = 'cosmos'
+
+@description('URL path prefix for the Azure AI Search MCP API within API Management.')
 param searchAPIPath string = 'search'
 
 // ------------------
@@ -16,6 +27,8 @@ param searchAPIPath string = 'search'
 
 var resourceSuffix = uniqueString(subscription().id, resourceGroup().id)
 var apiManagementName = 'apim-${resourceSuffix}'
+var acrPullRole = resourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
+// var apimContributorRoleDefinitionID = resourceId('Microsoft.Authorization/roleDefinitions', '312a565d-c81f-4fd8-895a-4e21e48d571c')
 
 // ------------------
 //    RESOURCES
@@ -96,8 +109,6 @@ resource containerAppUAI 'Microsoft.ManagedIdentity/userAssignedIdentities@2022-
   location: location
 }
 
-var acrPullRole = resourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
-@description('This allows the managed identity of the container app to access the registry, note scope is applied to the wider ResourceGroup not the ACR')
 resource containerAppUAIRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(resourceGroup().id, containerAppUAI.id, acrPullRole)
   properties: {
@@ -207,7 +218,6 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
 //    RESOURCES
 // ------------------
 
-// https://learn.microsoft.com/azure/templates/microsoft.apimanagement/service
 resource apimService 'Microsoft.ApiManagement/service@2024-06-01-preview' = {
   name: apiManagementName
   location: location
@@ -269,7 +279,6 @@ resource apimSubscription 'Microsoft.ApiManagement/service/subscriptions@2024-06
   }
 }
 
-// var apimContributorRoleDefinitionID = resourceId('Microsoft.Authorization/roleDefinitions', '312a565d-c81f-4fd8-895a-4e21e48d571c')
 // resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' =  {
 //     scope: apimService
 //     name: guid(subscription().id, resourceGroup().id, apimContributorRoleDefinitionID)
