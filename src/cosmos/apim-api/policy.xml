@@ -1,0 +1,17 @@
+<policies>
+    <inbound>
+        <base />
+        <set-header name="Ocp-Apim-Subscription-Key" exists-action="override">
+            <value>@(context.Request.Headers.GetValueOrDefault("Ocp-Apim-Subscription-Key", ""))</value>
+        </set-header>
+    </inbound>
+    <backend>
+        <base />
+    </backend>
+    <outbound>
+        <base />
+    </outbound>
+    <on-error>
+        <base />
+    </on-error>
+</policies>

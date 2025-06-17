@@ -1,3 +1,0 @@
-"""
-FreshMCP package.
-"""
