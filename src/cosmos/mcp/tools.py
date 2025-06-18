@@ -8,6 +8,20 @@ from mcp.types import Tool
 def get_cosmosdb_tools() -> list[Tool]:
     return [
         Tool(
+            name="cosmosdb_account_list",
+            description="List Cosmos DB accounts",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "account_name": {
+                        "type": "string",
+                        "description": "Name of the Cosmos DB account",
+                    },
+                },
+                "required": ["account_name"],
+            },
+        ),
+        Tool(
             name="cosmosdb_database_list",
             description="List all Cosmos DB databases in an account",
             inputSchema={
@@ -76,13 +90,14 @@ def get_cosmosdb_tools() -> list[Tool]:
                         "description": "Name of the Cosmos DB database.",
                     },
                     "partition_key": {
-                        "type": "object",
-                        "description": "Partition key definition for the container (e.g., {'paths': ['/partitionKey'], 'kind': 'Hash'})",
+                        "type": "string",
+                        "description": "Partition key path for the container (e.g., '/partitionKey')",
                     },
                 },
                 "required": [
                     "account_name",
                     "container_name",
+                    "database_name",
                     "partition_key"
                 ],
             },
@@ -193,15 +208,9 @@ def get_cosmosdb_tools() -> list[Tool]:
                         "description": "Cosmos DB SQL query string",
                     },
                     "parameters": {
-                        "type": "array",
+                        "type": "object",
                         "description": "Parameters for the SQL query (optional)",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "name": {"type": "string"},
-                                "value": {}
-                            },
-                        },
+                        "additionalProperties": True,
                     },
                 },
                 "required": [

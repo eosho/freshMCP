@@ -4,20 +4,19 @@
 This file contains the server for the Cosmos DB MCP service.
 """
 
+import asyncio
+from contextlib import asynccontextmanager
 import logging
 import sys
-from typing import List, Dict, Any
+from typing import List, Dict, Any, AsyncGenerator
 import uvicorn
 import argparse
 from mcp.server.fastmcp import FastMCP
 from .cosmos import CosmosDBServer
 from mcp.server import Server
-from starlette.applications import Starlette
 from mcp.server.sse import SseServerTransport
-from starlette.requests import Request
+from fastapi import FastAPI, Request, Response
 from starlette.routing import Mount, Route
-from starlette.middleware import Middleware
-from starlette.middleware.cors import CORSMiddleware
 
 # Configure logging
 logging.basicConfig(
@@ -32,6 +31,9 @@ cosmos_service = CosmosDBServer()
 
 # Initialize MCP server
 mcp = FastMCP("cosmosdb_mcp")
+
+# Session management
+sessions: dict[str, asyncio.Future] = {}
 
 # Version information
 VERSION = "1.0.0"
@@ -92,21 +94,35 @@ async def prompt_resource(message: str) -> str:
     return f"Please process this message: {message}"
 
 @mcp.tool(
-    name="list_databases",
+    name="cosmosdb_account_list",
+    description="List Cosmos DB accounts (placeholder - requires account name)"
+)
+async def list_accounts(account_name: str) -> Dict[str, Any]:
+    """
+    List Cosmos DB accounts.
+    Args:
+        account_name (str): The name of the account
+    Returns:
+        Dict[str, Any]: A dictionary containing the account information
+    """
+    return await cosmos_service.execute_tool("cosmosdb_account_list", {"account_name": account_name})
+
+@mcp.tool(
+    name="cosmosdb_database_list",
     description="List the databases in the account"
 )
-async def list_databases(account_name: str) -> List[str]:
+async def list_databases(account_name: str) -> Dict[str, Any]:
     """
     List the databases in the account.
     Args:
         account_name (str): The name of the account
     Returns:
-        List[str]: A list of the databases
+        Dict[str, Any]: A dictionary containing the databases
     """
-    return await cosmos_service._list_databases(account_name)
+    return await cosmos_service.execute_tool("cosmosdb_database_list", {"account_name": account_name})
 
 @mcp.tool(
-    name="describe_database",
+    name="cosmosdb_database_describe",
     description="Describe the database including its properties and settings"
 )
 async def describe_database(account_name: str, database_name: str) -> Dict[str, Any]:
@@ -118,25 +134,49 @@ async def describe_database(account_name: str, database_name: str) -> Dict[str, 
     Returns:
         Dict[str, Any]: A dictionary containing the database details
     """
-    return await cosmos_service._describe_database(account_name, database_name)
+    return await cosmos_service.execute_tool("cosmosdb_database_describe", {
+        "account_name": account_name,
+        "database_name": database_name
+    })
 
 @mcp.tool(
-    name="list_containers",
+    name="cosmosdb_database_create",
+    description="Create a new Cosmos DB database"
+)
+async def create_database(account_name: str, database_name: str) -> Dict[str, Any]:
+    """
+    Create a new database.
+    Args:
+        account_name (str): The name of the account
+        database_name (str): The name of the database
+    Returns:
+        Dict[str, Any]: A dictionary containing the database details
+    """
+    return await cosmos_service.execute_tool("cosmosdb_database_create", {
+        "account_name": account_name,
+        "database_name": database_name
+    })
+
+@mcp.tool(
+    name="cosmosdb_container_list",
     description="List the containers in the database"
 )
-async def list_containers(account_name: str, database_name: str) -> List[str]:
+async def list_containers(account_name: str, database_name: str) -> Dict[str, Any]:
     """
     List the containers in the database.
     Args:
         account_name (str): The name of the account
         database_name (str): The name of the database
     Returns:
-        List[str]: A list of the containers
+        Dict[str, Any]: A dictionary containing the containers
     """
-    return await cosmos_service._list_containers(account_name, database_name)
+    return await cosmos_service.execute_tool("cosmosdb_container_list", {
+        "account_name": account_name,
+        "database_name": database_name
+    })
 
 @mcp.tool(
-    name="create_container",
+    name="cosmosdb_container_create",
     description="Create a container in the database with specified partition key"
 )
 async def create_container(account_name: str, database_name: str, container_name: str, partition_key: str) -> Dict[str, Any]:
@@ -150,10 +190,15 @@ async def create_container(account_name: str, database_name: str, container_name
     Returns:
         Dict[str, Any]: A dictionary containing the container details
     """
-    return await cosmos_service._create_container(account_name, database_name, container_name, partition_key)
+    return await cosmos_service.execute_tool("cosmosdb_container_create", {
+        "account_name": account_name,
+        "database_name": database_name,
+        "container_name": container_name,
+        "partition_key": partition_key
+    })
 
 @mcp.tool(
-    name="delete_container",
+    name="cosmosdb_container_delete",
     description="Delete a container from the database"
 )
 async def delete_container(account_name: str, database_name: str, container_name: str) -> Dict[str, Any]:
@@ -166,10 +211,14 @@ async def delete_container(account_name: str, database_name: str, container_name
     Returns:
         Dict[str, Any]: A dictionary containing the operation result
     """
-    return await cosmos_service._delete_container(account_name, database_name, container_name)
+    return await cosmos_service.execute_tool("cosmosdb_container_delete", {
+        "account_name": account_name,
+        "database_name": database_name,
+        "container_name": container_name
+    })
 
 @mcp.tool(
-    name="read_item",
+    name="cosmosdb_item_read",
     description="Read an item from the container using its ID and partition key"
 )
 async def read_item(account_name: str, database_name: str, container_name: str, item_id: str, partition_key: str) -> Dict[str, Any]:
@@ -184,15 +233,21 @@ async def read_item(account_name: str, database_name: str, container_name: str, 
     Returns:
         Dict[str, Any]: A dictionary containing the item
     """
-    return await cosmos_service._read_item(account_name, database_name, container_name, item_id, partition_key)
+    return await cosmos_service.execute_tool("cosmosdb_item_read", {
+        "account_name": account_name,
+        "database_name": database_name,
+        "container_name": container_name,
+        "item_id": item_id,
+        "partition_key": partition_key
+    })
 
 @mcp.tool(
-    name="query_item",
+    name="cosmosdb_item_query",
     description="Query items in the container using SQL-like query syntax"
 )
-async def query_items(account_name: str, database_name: str, container_name: str, query: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+async def query_items(account_name: str, database_name: str, container_name: str, query: str, parameters: Dict[str, Any] = None) -> Dict[str, Any]:
     """
-    Query an item in the container.
+    Query items in the container.
     Args:
         account_name (str): The name of the account
         database_name (str): The name of the database
@@ -202,56 +257,101 @@ async def query_items(account_name: str, database_name: str, container_name: str
     Returns:
         Dict[str, Any]: A dictionary containing the query results
     """
-    return await cosmos_service._query_items(account_name, database_name, container_name, query, parameters)
+    return await cosmos_service.execute_tool("cosmosdb_item_query", {
+        "account_name": account_name,
+        "database_name": database_name,
+        "container_name": container_name,
+        "query": query,
+        "parameters": parameters or {}
+    })
 
-def create_starlette_app(mcp_server: Server, *, debug: bool = False) -> Starlette:
-    """Create a Starlette application that can serve the provided mcp server with SSE.
+def create_app(mcp_server: Server, *, debug: bool = False) -> FastAPI:
+    """Create a FastAPI application that can serve the provided mcp server with SSE.
     Args:
         mcp_server (Server): The MCP server to serve
         debug (bool): Whether to run in debug mode
     Returns:
-        Starlette: The Starlette application
+        FastAPI: The FastAPI application
     """
     sse = SseServerTransport("/cosmos/messages/")
 
-    async def handle_sse(request: Request) -> None:
-        """Handle SSE connections.
-        Args:
-            request (Request): The incoming request
-        """
-        logger.info("Handling new SSE connection")
-        async with sse.connect_sse(
-            request.scope,
-            request.receive,
-            request._send,
-        ) as (read_stream, write_stream):
-            await mcp_server.run(
-                read_stream,
-                write_stream,
-                mcp_server.create_initialization_options(),
-            )
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+        yield
+        for fut in sessions.values():
+            fut.set_result(None)
 
-    return Starlette(
+    async def handle_sse(request: Request) -> Response:
+        try:
+            session_id = request.query_params.get("session_id")
+            if session_id not in sessions:
+                sessions[session_id] = asyncio.Future()
+
+            async with sse.connect_sse(
+                request.scope,
+                request.receive,
+                request._send,
+            ) as (read_stream, write_stream):
+                task = asyncio.create_task(
+                    mcp_server.run(
+                        read_stream,
+                        write_stream,
+                        mcp_server.create_initialization_options(),
+                    )
+                )
+
+                try:
+                    await asyncio.wait(
+                        [sessions[session_id], task],
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+
+                    # Properly cancel the task if it was the future that completed
+                    if sessions[session_id].done() and not task.done():
+                        task.cancel()
+                        try:
+                            await task
+                        except asyncio.CancelledError:
+                            pass
+                finally:
+                    # Clean up the session if it's still in the dictionary
+                    if session_id in sessions:
+                        del sessions[session_id]
+
+            return Response(status_code=200)
+        except Exception as e:
+            logger.error(f"Error in handle_sse: {e}")
+            return Response(status_code=500)
+
+    async def disconnect(request: Request) -> Response:
+        try:
+            session_id = request.query_params.get("session_id")
+            if session_id in sessions:
+                fut = sessions[session_id]
+                # Set the result to signal the waiting code in handle_sse
+                fut.set_result(None)
+                return Response(status_code=200)
+            else:
+                return Response(status_code=404, content="Session not found")
+        except Exception as e:
+            logger.error(f"Error in disconnect: {e}")
+            return Response(status_code=500)
+
+    app = FastAPI(
         debug=debug,
         routes=[
             Route("/cosmos/sse", endpoint=handle_sse),
+            Route("/cosmos/disconnect", endpoint=disconnect),
             Mount("/cosmos/messages/", app=sse.handle_post_message),
         ],
-        middleware=[
-            Middleware(
-                CORSMiddleware,
-                allow_origins=["*"],
-                allow_methods=["*"],
-                allow_headers=["*"],
-            )
-        ]
+        lifespan=lifespan,
     )
 
-# Initialize server instances
-mcp_server = mcp._mcp_server
-starlette_app = create_starlette_app(mcp_server, debug=True)
+    return app
 
 if __name__ == "__main__":
+    mcp_server = mcp._mcp_server
+
     parser = argparse.ArgumentParser(description='Run MCP SSE-based server')
     parser.add_argument('--host', default='0.0.0.0', help='Host to bind to')
     parser.add_argument('--port', type=int, default=8001, help='Port to listen on')
@@ -261,6 +361,7 @@ if __name__ == "__main__":
 
     # Configure logging level from command line
     logging.getLogger().setLevel(args.log_level)
-    
+
     logger.info(f"Starting server on {args.host}:{args.port}")
-    uvicorn.run(starlette_app, host=args.host, port=args.port)
+    app = create_app(mcp_server, debug=True)
+    uvicorn.run(app, host=args.host, port=args.port)

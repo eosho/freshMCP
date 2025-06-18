@@ -42,7 +42,7 @@ class CosmosDBServer(Server):
         self._credential = DefaultAzureCredential()
 
     @property
-    def service_name(self) -> str:
+    def name(self) -> str:
         """
         Get the name of the service.
         """
@@ -118,7 +118,15 @@ class CosmosDBServer(Server):
 
                 return await self._describe_database(account_name, database_name)
 
-            if tool_name == "cosmosdb_container_list":
+            elif tool_name == "cosmosdb_database_create":
+                account_name = tool_args["account_name"]
+                database_name = tool_args["database_name"]
+                if not account_name or not database_name:
+                    raise ValueError("Account name and database name are required")
+
+                return await self._create_database(account_name, database_name)
+
+            elif tool_name == "cosmosdb_container_list":
                 account_name = tool_args["account_name"]
                 database_name = tool_args["database_name"]
                 if not account_name or not database_name:
@@ -168,19 +176,6 @@ class CosmosDBServer(Server):
 
                 return await self._query_items(account_name, database_name, container_name, query, parameters)
 
-            elif tool_name == "cosmosdb_item_replace":
-                account_name = tool_args["account_name"]
-                database_name = tool_args["database_name"]
-                container_name = tool_args["container_name"]
-                item_id = tool_args["item_id"]
-                item = tool_args["item"]
-                partition_key = tool_args["partition_key"]
-
-                if not account_name or not database_name or not container_name or not item_id or not item or not partition_key:
-                    raise ValueError("Account name, database name, container name, item ID, item, and partition key are required")
-
-                return await self._replace_item(account_name, database_name, container_name, item_id, item, partition_key)
-
             else:
                 raise ValueError(f"Unsupported tool: {tool_name}")
         except ResourceNotFoundError as e:
@@ -202,6 +197,57 @@ class CosmosDBServer(Server):
             error_msg = f"Unexpected error: {str(e)}"
             logger.error(error_msg)
             return {"error": error_msg}
+
+    async def _list_accounts(self, account_name: str) -> Dict[str, Any]:
+        """
+        List Cosmos DB accounts (placeholder implementation).
+        Note: This is a placeholder as listing accounts typically requires management API access.
+        Args:
+            account_name (str): The name of the account
+        Returns:
+            Dict[str, Any]: A dictionary containing the account information
+        """
+        logger.info(f"Listing account: {account_name}")
+        try:
+            # This is a placeholder implementation
+            # In a real scenario, you would use the Azure Management API to list accounts
+            return {
+                "accounts": [{
+                    "id": account_name,
+                    "name": account_name,
+                    "type": "account",
+                    "properties": {
+                        "documentEndpoint": f"https://{account_name}.documents.azure.com:443/"
+                    }
+                }]
+            }
+        except Exception as e:
+            logger.error(f"Error listing accounts: {e}")
+            return {"error": str(e)}
+
+    async def _create_database(self, account_name: str, database_name: str) -> Dict[str, Any]:
+        """
+        Create a new database in the Cosmos DB account.
+        Args:
+            account_name (str): The name of the account
+            database_name (str): The name of the database
+        Returns:
+            Dict[str, Any]: A dictionary containing the database details
+        """
+        logger.info(f"Creating database: {database_name} for account: {account_name}")
+        try:
+            client = self.get_cosmos_client(account_name)
+            database = client.create_database_if_not_exists(database_name)
+            logger.info(f"Database created successfully: {database.id}")
+            return {
+                "id": database.id,
+                "name": database.id,
+                "type": "database",
+                "properties": database.read()
+            }
+        except Exception as e:
+            logger.error(f"Error creating database: {e}")
+            return {"error": str(e)}
 
     async def _list_databases(self, account_name: str) -> Dict[str, Any]:
         """
@@ -383,13 +429,13 @@ class CosmosDBServer(Server):
         try:
             client = self.get_cosmos_client(account_name)
             container = client.get_database_client(database_name).get_container_client(container_name)
-            
+
             # Convert parameters to list of dicts if provided
             query_params = []
             if parameters:
                 for key, value in parameters.items():
                     query_params.append({"name": key, "value": value})
-            
+
             # Execute query
             items = []
             query_iterable = container.query_items(
@@ -397,10 +443,10 @@ class CosmosDBServer(Server):
                 parameters=query_params,
                 enable_cross_partition_query=True
             )
-            
+
             for item in query_iterable:
                 items.append(item)
-            
+
             logger.info(f"Query returned {len(items)} items")
             return {"items": items}
         except Exception as e:
