@@ -7,8 +7,7 @@ This file contains the server for the AI Search MCP service.
 import os
 import logging
 import sys
-
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from functools import lru_cache
 from dotenv import load_dotenv
 from mcp.server import Server
@@ -20,7 +19,13 @@ from azure.core.exceptions import AzureError
 from azure.search.documents import SearchClient
 from azure.search.documents.models import QueryType
 from azure.search.documents.indexes import SearchIndexClient
-from tools import get_search_tools
+from azure.search.documents.indexes.models import (
+    SearchIndex,
+    SimpleField,
+    SearchableField,
+    SearchFieldDataType
+)
+from .tools import get_search_tools
 
 # Configure logging
 logging.basicConfig(
@@ -42,7 +47,7 @@ class SearchServer(Server):
         self._credential = DefaultAzureCredential()
 
     @property
-    def service_name(self) -> str:
+    def name(self) -> str:
         """Get the name of the service."""
         return "search_mcp"
 
@@ -116,6 +121,8 @@ class SearchServer(Server):
             Any: The result of the tool execution
         """
         try:
+            logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
+
             if tool_name == "search_index_list":
                 service_name = tool_args["service_name"]
                 if not service_name:
@@ -149,6 +156,14 @@ class SearchServer(Server):
 
                 return await self._describe_index(service_name, index_name)
 
+            elif tool_name == "search_index_create":
+                service_name = tool_args["service_name"]
+                index_name = tool_args["index_name"]
+                if not service_name or not index_name:
+                    raise ValueError("Service name and index name are required")
+
+                return await self._create_index(service_name, index_name)
+
             else:
                 raise ValueError(f"Unsupported tool: {tool_name}")
 
@@ -172,6 +187,82 @@ class SearchServer(Server):
             logger.error(error_msg)
             return {"error": error_msg}
 
+    async def _create_index(self, service_name: str, index_name: str) -> Dict[str, Any]:
+        """Create a search index.
+
+        Args:
+            service_name (str): The name of the service
+            index_name (str): The name of the index
+
+        Returns:
+            Dict[str, Any]: A dictionary with a message indicating the index was created
+        """
+        logger.info(f"Creating index: {index_name} for service: {service_name}")
+        client = self.get_index_client(service_name)
+
+        # Create fields using the proper Azure Search SDK models
+        fields = [
+            SimpleField(
+                name="id",
+                type=SearchFieldDataType.String,
+                key=True,
+                searchable=False
+            ),
+            SearchableField(
+                name="content",
+                type=SearchFieldDataType.String,
+                searchable=True,
+                filterable=False,
+                sortable=False,
+                facetable=False
+            ),
+            SearchableField(
+                name="metadata",
+                type=SearchFieldDataType.String,
+                searchable=True,
+                filterable=True,
+                sortable=True,
+                facetable=True
+            ),
+            SearchableField(
+                name="title",
+                type=SearchFieldDataType.String,
+                searchable=True,
+                filterable=True,
+                sortable=True,
+                facetable=False
+            ),
+            SimpleField(
+                name="created_at",
+                type=SearchFieldDataType.DateTimeOffset,
+                filterable=True,
+                sortable=True,
+                facetable=False
+            )
+        ]
+
+        # Create the index using the SDK model
+        index = SearchIndex(
+            name=index_name,
+            fields=fields,
+            scoring_profiles=[],
+            default_scoring_profile=None,
+            cors_options=None,
+            suggesters=[],
+            analyzers=[],
+            tokenizers=[],
+            token_filters=[],
+            char_filters=[]
+        )
+
+        try:
+            client.create_index(index)
+            logger.info(f"Successfully created index: {index_name}")
+            return {"message": f"Index {index_name} created successfully"}
+        except Exception as e:
+            logger.error(f"Failed to create index {index_name}: {str(e)}")
+            raise
+
     async def _list_indexes(self, service_name: str) -> List[str]:
         """List all search indexes in the account.
 
@@ -183,9 +274,14 @@ class SearchServer(Server):
         """
         logger.info(f"Listing indexes for service: {service_name}")
         client = self.get_index_client(service_name)
-        indexes = client.list_indexes()
-        logger.info(f"Indexes: {indexes}")
-        return [index.name for index in indexes]
+        try:
+            indexes = client.list_indexes()
+            index_names = [index.name for index in indexes]
+            logger.info(f"Found {len(index_names)} indexes: {index_names}")
+            return index_names
+        except Exception as e:
+            logger.error(f"Failed to list indexes: {str(e)}")
+            raise
 
     async def _delete_index(self, service_name: str, index_name: str) -> Dict[str, Any]:
         """Delete a search index.
@@ -199,8 +295,13 @@ class SearchServer(Server):
         """
         logger.info(f"Deleting index: {index_name} for service: {service_name}")
         client = self.get_index_client(service_name)
-        client.delete_index(index_name)
-        return {"message": f"Index {index_name} deleted successfully"}
+        try:
+            client.delete_index(index_name)
+            logger.info(f"Successfully deleted index: {index_name}")
+            return {"message": f"Index {index_name} deleted successfully"}
+        except Exception as e:
+            logger.error(f"Failed to delete index {index_name}: {str(e)}")
+            raise
 
     async def _query_index(self, service_name: str, index_name: str, query: str, query_type: str = "simple") -> List[Dict[str, Any]]:
         """Query a search index with support for different query types.
@@ -214,7 +315,7 @@ class SearchServer(Server):
         Returns:
             List[Dict[str, Any]]: A list of search results
         """
-        logger.info(f"Querying index: {index_name} for service: {service_name}")
+        logger.info(f"Querying index: {index_name} for service: {service_name} with query: {query}")
         client = self.get_search_client(service_name, index_name)
 
         # Map query type to QueryType enum
@@ -224,14 +325,20 @@ class SearchServer(Server):
             "semantic": QueryType.SEMANTIC
         }
 
-        # Execute search with specified query type
-        results = client.search(
-            search_text=query,
-            query_type=query_type_map.get(query_type, QueryType.SIMPLE)
-        )
+        try:
+            # Execute search with specified query type
+            results = client.search(
+                search_text=query,
+                query_type=query_type_map.get(query_type, QueryType.SIMPLE)
+            )
 
-        logger.info(f"Search results: {results}")
-        return [result.to_dict() for result in results]
+            # Convert results to list of dictionaries
+            result_list = [result.to_dict() for result in results]
+            logger.info(f"Found {len(result_list)} results")
+            return result_list
+        except Exception as e:
+            logger.error(f"Failed to query index: {str(e)}")
+            raise
 
     async def _describe_index(self, service_name: str, index_name: str) -> Dict[str, Any]:
         """Describe a search index including its fields and configuration.
@@ -245,6 +352,11 @@ class SearchServer(Server):
         """
         logger.info(f"Describing index: {index_name} for service: {service_name}")
         client = self.get_index_client(service_name)
-        index = client.get_index(index_name)
-        logger.info(f"Index description: {index.to_dict()}")
-        return index.to_dict()
+        try:
+            index = client.get_index(index_name)
+            index_dict = index.to_dict()
+            logger.info(f"Successfully retrieved index description for {index_name}")
+            return index_dict
+        except Exception as e:
+            logger.error(f"Failed to describe index {index_name}: {str(e)}")
+            raise
