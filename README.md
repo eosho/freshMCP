@@ -229,13 +229,7 @@ This will:
 
 ### Cosmos DB RBAC
 
-1. Create a user-assigned managed identity:
-
-```bash
-az identity create --name fresh-mcp-identity --resource-group <your-resource-group>
-```
-
-2. Grant the necessary RBAC role to the managed identity:
+1. Grant the necessary RBAC role to the system-assigned managed identity:
 
 ```bash
 az cosmosdb sql role assignment create \
@@ -246,18 +240,11 @@ az cosmosdb sql role assignment create \
     --scope "/"
 ```
 
-3. Assign the managed identity to your Container App:
-
-```bash
-az containerapp identity assign \
-    --name <your-container-app> \
-    --resource-group <your-resource-group> \
-    --user-assigned <managed-identity-resource-id>
-```
+> **Note**: The system-assigned managed identity is assigned to your cosmosdb Container App by default.
 
 ### AI Search RBAC
 
-1. Grant the necessary RBAC role to the managed identity:
+1. Grant the necessary RBAC role to the system-assigned managed identity:
 
 ```bash
 az role assignment create \
@@ -265,6 +252,8 @@ az role assignment create \
     --role "Search Service Contributor" \
     --scope /subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.Search/searchServices/<search-service-name>
 ```
+
+> **Note**: The system-assigned managed identity is assigned to your search Container App by default.
 
 ---
 
