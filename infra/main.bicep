@@ -127,11 +127,11 @@ resource containerAppUAI 'Microsoft.ManagedIdentity/userAssignedIdentities@2022-
 }
 
 resource containerAppUAIRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroup().id, containerAppUAI.id, acrPullRole)
+  name: guid(containerRegistry.id, containerAppUAI.id, acrPullRole)
+  scope: containerRegistry
   properties: {
     roleDefinitionId: acrPullRole
     principalId: containerAppUAI.properties.principalId
-    principalType: 'ServicePrincipal'
   }
 }
 
@@ -139,7 +139,7 @@ resource cosmosMCPServerContainerApp 'Microsoft.App/containerApps@2023-11-02-pre
   name: 'aca-cosmos-${resourceSuffix}'
   location: location
   identity: {
-    type: 'UserAssigned'
+    type: 'SystemAssigned, UserAssigned'
     userAssignedIdentities: {
       '${containerAppUAI.id}': {}
     }
@@ -185,7 +185,7 @@ resource searchMCPServerContainerApp 'Microsoft.App/containerApps@2023-11-02-pre
   name: 'aca-search-${resourceSuffix}'
   location: location
   identity: {
-    type: 'UserAssigned'
+    type: 'SystemAssigned, UserAssigned'
     userAssignedIdentities: {
       '${containerAppUAI.id}': {}
     }
