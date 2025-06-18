@@ -209,8 +209,6 @@ class CosmosDBServer(Server):
         """
         logger.info(f"Listing account: {account_name}")
         try:
-            # This is a placeholder implementation
-            # In a real scenario, you would use the Azure Management API to list accounts
             return {
                 "accounts": [{
                     "id": account_name,

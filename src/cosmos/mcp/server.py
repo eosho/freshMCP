@@ -4,19 +4,18 @@
 This file contains the server for the Cosmos DB MCP service.
 """
 
-import asyncio
-from contextlib import asynccontextmanager
 import logging
 import sys
-from typing import List, Dict, Any, AsyncGenerator
+from typing import List, Dict, Any
 import uvicorn
 import argparse
 from mcp.server.fastmcp import FastMCP
 from .cosmos import CosmosDBServer
 from mcp.server import Server
 from mcp.server.sse import SseServerTransport
-from fastapi import FastAPI, Request, Response
+from starlette.applications import Starlette
 from starlette.routing import Mount, Route
+from starlette.requests import Request
 
 # Configure logging
 logging.basicConfig(
@@ -31,9 +30,6 @@ cosmos_service = CosmosDBServer()
 
 # Initialize MCP server
 mcp = FastMCP("cosmosdb_mcp")
-
-# Session management
-sessions: dict[str, asyncio.Future] = {}
 
 # Version information
 VERSION = "1.0.0"
@@ -265,89 +261,29 @@ async def query_items(account_name: str, database_name: str, container_name: str
         "parameters": parameters or {}
     })
 
-def create_app(mcp_server: Server, *, debug: bool = False) -> FastAPI:
-    """Create a FastAPI application that can serve the provided mcp server with SSE.
-    Args:
-        mcp_server (Server): The MCP server to serve
-        debug (bool): Whether to run in debug mode
-    Returns:
-        FastAPI: The FastAPI application
-    """
+def create_app(mcp_server: Server, *, debug: bool = False) -> Starlette:
+    """Create a Starlette application that can server the provided mcp server with SSE."""
     sse = SseServerTransport("/cosmos/messages/")
 
-    @asynccontextmanager
-    async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-        yield
-        for fut in sessions.values():
-            fut.set_result(None)
-
-    async def handle_sse(request: Request) -> Response:
-        try:
-            session_id = request.query_params.get("session_id")
-            if session_id not in sessions:
-                sessions[session_id] = asyncio.Future()
-
-            async with sse.connect_sse(
+    async def handle_sse(request: Request) -> None:
+        async with sse.connect_sse(
                 request.scope,
                 request.receive,
-                request._send,
-            ) as (read_stream, write_stream):
-                task = asyncio.create_task(
-                    mcp_server.run(
-                        read_stream,
-                        write_stream,
-                        mcp_server.create_initialization_options(),
-                    )
-                )
+                request._send,  # noqa: SLF001
+        ) as (read_stream, write_stream):
+            await mcp_server.run(
+                read_stream,
+                write_stream,
+                mcp_server.create_initialization_options(),
+            )
 
-                try:
-                    await asyncio.wait(
-                        [sessions[session_id], task],
-                        return_when=asyncio.FIRST_COMPLETED,
-                    )
-
-                    # Properly cancel the task if it was the future that completed
-                    if sessions[session_id].done() and not task.done():
-                        task.cancel()
-                        try:
-                            await task
-                        except asyncio.CancelledError:
-                            pass
-                finally:
-                    # Clean up the session if it's still in the dictionary
-                    if session_id in sessions:
-                        del sessions[session_id]
-
-            return Response(status_code=200)
-        except Exception as e:
-            logger.error(f"Error in handle_sse: {e}")
-            return Response(status_code=500)
-
-    async def disconnect(request: Request) -> Response:
-        try:
-            session_id = request.query_params.get("session_id")
-            if session_id in sessions:
-                fut = sessions[session_id]
-                # Set the result to signal the waiting code in handle_sse
-                fut.set_result(None)
-                return Response(status_code=200)
-            else:
-                return Response(status_code=404, content="Session not found")
-        except Exception as e:
-            logger.error(f"Error in disconnect: {e}")
-            return Response(status_code=500)
-
-    app = FastAPI(
+    return Starlette(
         debug=debug,
         routes=[
             Route("/cosmos/sse", endpoint=handle_sse),
-            Route("/cosmos/disconnect", endpoint=disconnect),
             Mount("/cosmos/messages/", app=sse.handle_post_message),
         ],
-        lifespan=lifespan,
     )
-
-    return app
 
 if __name__ == "__main__":
     mcp_server = mcp._mcp_server
@@ -363,5 +299,7 @@ if __name__ == "__main__":
     logging.getLogger().setLevel(args.log_level)
 
     logger.info(f"Starting server on {args.host}:{args.port}")
+
+    # Bind SSE request handling to MCP server
     app = create_app(mcp_server, debug=True)
     uvicorn.run(app, host=args.host, port=args.port)
