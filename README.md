@@ -19,6 +19,80 @@ FreshMCP is a comprehensive service that provides standardized interfaces for in
 
 ---
 
+## Architecture & Flow
+
+### System Architecture
+
+```mermaid
+graph TB
+    subgraph "Client Layer"
+        A[VSCode/Cursor Client]
+        B[Web Application]
+    end
+
+    subgraph "APIM Gateway"
+        C[Azure API Management]
+        D[Rate Limiting]
+        E[Authentication]
+        F[Request Routing]
+    end
+
+    subgraph "MCP Agent Layer"
+        G[Cosmos DB MCP Agent]
+        H[Search MCP Agent]
+    end
+
+    subgraph "Azure Services"
+        J[Cosmos DB]
+        K[AI Search]
+    end
+
+    A --> C
+    B --> C
+    C --> D
+    C --> E
+    C --> F
+    F --> G
+    F --> H
+    G --> J
+    H --> K
+```
+
+### Request Flow
+
+1. **Client Request**: VSCode/Cursor or web application sends request to APIM
+2. **APIM Processing**:
+   - Authentication and authorization
+   - Rate limiting and throttling
+   - Request routing based on service type
+3. **MCP Agent Processing**:
+   - Tool execution based on request type
+   - Service-specific operations
+   - Response formatting
+4. **Azure Service Interaction**:
+   - Direct API calls to Azure services
+   - Data retrieval and manipulation
+   - Telemetry collection
+
+### APIM Configuration
+
+The Azure API Management (APIM) serves as the central gateway for all MCP agent communications:
+
+- **Authentication**: Subscription key-based authentication
+- **Rate Limiting**: Configurable limits per subscription
+- **Routing**: Intelligent routing to appropriate MCP agents
+- **Monitoring**: Built-in analytics and monitoring
+- **Caching**: Response caching for improved performance
+
+### MCP Agent Communication
+
+Each MCP agent communicates via Server-Sent Events (SSE) protocol:
+
+- **Cosmos DB Agent**: Handles all database operations
+- **Search Agent**: Manages AI Search index operations
+
+---
+
 ## Prerequisites
 
 - Python 3.11 or higher
@@ -129,7 +203,7 @@ Add the tools of any MCP server to VSCode or Cursor providing a JSON configurati
 1. Initialize azd (if not already done):
 
 ```bash
-azd init -e dev -l eastus 
+azd init -e dev -l eastus
 
 # -e dev is optional, it will create a new dev environment
 
