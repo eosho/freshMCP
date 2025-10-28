@@ -12,7 +12,7 @@ setup(
         "mcp==1.9.0",
         "azure.identity==1.21.0",
         "sse-starlette==2.2.1",
-        "starlette==0.46.0",
+        "starlette==0.49.1",
         "azure-cosmos==4.9.0",
     ],
     python_requires=">=3.11",
